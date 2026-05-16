@@ -42,9 +42,18 @@ export default function LeaderboardPage({ params }: { params: Promise<{ roomId: 
 
   useEffect(() => {
     const hostId = localStorage.getItem('dingbats_host_id');
-    const playerId = localStorage.getItem(`dingbats_player_${roomId}`);
-    setIsHost(!!hostId && room?.host_id === hostId);
-    setCurrentPlayerId(playerId);
+    const roomIdStored = roomId; // From params
+    const playerId = localStorage.getItem(`dingbats_player_${roomIdStored}`);
+    
+    const hostMatched = !!hostId && room?.host_id === hostId;
+    setIsHost(hostMatched);
+    
+    // Only identify as a player if NOT the host of this room
+    if (!hostMatched) {
+      setCurrentPlayerId(playerId);
+    } else {
+      setCurrentPlayerId(null);
+    }
   }, [roomId, room?.host_id]);
 
   if (!room) return <div className="p-8 text-center text-gray-500">Loading...</div>;
