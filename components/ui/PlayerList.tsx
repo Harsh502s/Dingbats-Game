@@ -20,8 +20,10 @@ export function PlayerList({ players, onKick, currentPlayerId }: PlayerListProps
             className={`flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border ${player.id === currentPlayerId ? 'border-brand-500' : 'border-gray-100'}`}
           >
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-orange-100 text-brand-500 flex items-center justify-center font-bold text-sm uppercase">
-                {player.name.substring(0, 2)}
+              <div className="w-8 h-8 rounded-full bg-orange-100 text-brand-500 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
               </div>
               <span className="font-medium text-gray-900">{player.name} {player.id === currentPlayerId && '(You)'}</span>
             </div>

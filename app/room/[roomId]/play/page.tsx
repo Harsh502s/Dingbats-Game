@@ -124,18 +124,20 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
       await supabase.channel(`room:${roomId}`).send({
         type: 'broadcast',
         event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points }
+        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points, guessText: guess }
       });
     } else {
       setShowWrong(true);
       setTimeout(() => setShowWrong(false), 1500);
       
+      const wrongGuess = guess;
+      setGuess('');
+
       await supabase.channel(`room:${roomId}`).send({
         type: 'broadcast',
         event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false }
+        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false, guessText: wrongGuess }
       });
-      setGuess('');
     }
     
     setSubmitting(false);

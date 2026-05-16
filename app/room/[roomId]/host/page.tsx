@@ -86,6 +86,19 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     }
   }, [room?.status, router, roomId]);
 
+  useEffect(() => {
+    if (room?.status === 'PLAYING' && players.length > 0) {
+      const correctGuesserIds = new Set(guesses.filter(g => g.correct).map(g => g.playerId));
+      const activePlayerIds = players.map(p => p.id);
+
+      const allGuessed = activePlayerIds.every(id => correctGuesserIds.has(id));
+
+      if (allGuessed && !loading) {
+        handleNextRound();
+      }
+    }
+  }, [guesses, players.length, room?.status, loading]);
+
   // Guesses now managed by useRoomChannel
 
   if (!room || !hostId) return <div className="p-8 text-center text-gray-500">Loading...</div>;
@@ -129,12 +142,12 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
 
   if (room.status === 'LOBBY') {
     const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}/join` : '';
-    
+
     return (
       <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-8 relative">
-        <Button 
-          variant="secondary" 
-          className="absolute top-4 left-4" 
+        <Button
+          variant="secondary"
+          className="absolute top-4 left-4"
           onClick={() => router.push('/')}
         >
           ← Home
@@ -149,21 +162,21 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
 
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">1. Choose Puzzles</h2>
+            <h2 className="text-2xl font-bold">Choose Puzzles</h2>
             <div className="flex bg-gray-100 p-1 rounded-xl">
-              <button 
+              <button
                 onClick={() => setActiveTab('custom')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'custom' ? 'bg-white shadow-sm text-brand-500' : 'text-gray-500'}`}
               >
                 Custom Room Puzzles
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('library')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'library' ? 'bg-white shadow-sm text-brand-500' : 'text-gray-500'}`}
               >
                 Library Packs
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('create')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'create' ? 'bg-white shadow-sm text-brand-500' : 'text-gray-500'}`}
               >
@@ -197,8 +210,8 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                         key={p}
                         onClick={() => setSelectedPack(p)}
                         className={`p-6 rounded-2xl border-2 text-left transition-all duration-200 group relative overflow-hidden cursor-pointer
-                          ${selectedPack === p 
-                            ? 'border-brand-500 bg-orange-50 ring-4 ring-orange-50' 
+                          ${selectedPack === p
+                            ? 'border-brand-500 bg-orange-50 ring-4 ring-orange-50'
                             : 'border-gray-100 bg-white hover:border-brand-300 hover:bg-gray-50'}`}
                       >
                         <div className="flex flex-col h-full justify-between relative z-10">
@@ -224,7 +237,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                             <h3 className={`font-bold text-lg mb-1 ${selectedPack === p ? 'text-brand-600' : 'text-gray-700'}`}>{p}</h3>
                             <p className="text-xs text-gray-400">Library Pack</p>
                           </div>
-                          
+
                           {selectedPack === p && (
                             <div className="mt-4 flex items-center text-xs font-bold text-brand-500 uppercase tracking-widest">
                               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,7 +247,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="absolute -right-4 -bottom-4 opacity-[0.03] transform rotate-12 transition-transform group-hover:scale-110">
                           <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -262,15 +275,15 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">Pack Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="e.g. Science Dingbats, My Colleagues Pack..."
                   value={newPackName}
                   onChange={(e) => setNewPackName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-brand-500 outline-none"
                 />
               </div>
-              
+
               {newPackName.trim().length > 2 ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -302,7 +315,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
 
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">2. Players ({players.length})</h2>
+            <h2 className="text-2xl font-bold">Players ({players.length})</h2>
           </div>
           <PlayerList players={players} onKick={handleKick} />
         </div>
@@ -318,11 +331,12 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     );
   }
 
+
   return (
     <main className="min-h-screen p-8 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative pt-20 lg:pt-8">
-      <Button 
-        variant="secondary" 
-        className="absolute top-4 left-4 lg:hidden" 
+      <Button
+        variant="secondary"
+        className="absolute top-4 left-4 lg:hidden"
         onClick={() => router.push('/')}
       >
         ← Home
@@ -330,9 +344,9 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
       <div className="lg:col-span-2 space-y-6">
         <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center space-x-4">
-            <Button 
-              variant="secondary" 
-              className="hidden lg:block mr-4" 
+            <Button
+              variant="secondary"
+              className="hidden lg:block mr-4"
               onClick={() => router.push('/')}
             >
               ← Home
@@ -340,11 +354,11 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
             <h1 className="text-2xl font-bold">Round {room.current_round} of {room.total_rounds}</h1>
           </div>
           <div className="flex items-center space-x-2">
-            <CountdownTimer 
-              startedAt={room.round_started_at} 
+            <CountdownTimer
+              startedAt={room.round_started_at}
               duration={room.round_duration}
               paused={isPaused}
-              onExpire={handleNextRound} 
+              onExpire={handleNextRound}
             />
             <button
               onClick={() => setIsPaused(p => !p)}
@@ -361,29 +375,13 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
             </Button>
           </div>
         </div>
-        
+
         <PuzzleCard imageUrl={cloudinaryUrl(currentPuzzleUrl || '', 800)} />
       </div>
 
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <h2 className="text-lg font-bold mb-4">Live Guesses</h2>
-          
-          {/* Active Typing Section */}
-          {Object.keys(typing).length > 0 && (
-            <div className="mb-4 space-y-2">
-              <p className="text-xs font-semibold text-brand-500 uppercase tracking-wider">Active Typing</p>
-              <div className="space-y-1">
-                {Object.entries(typing).map(([id, data]) => (
-                  <div key={id} className="text-sm bg-orange-50 border border-orange-100 rounded-lg p-2 flex justify-between items-center animate-pulse">
-                    <span className="font-bold text-gray-700">{data.name}:</span>
-                    <span className="text-brand-600 italic truncate ml-2">"{data.text}"</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
+          <h2 className="text-lg font-bold mb-4">Live Guess Log</h2>
           <GuessFeed guesses={guesses} />
         </div>
 
