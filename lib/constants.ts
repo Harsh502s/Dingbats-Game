@@ -1,0 +1,2 @@
+export const ROUND_DURATION_SECONDS = 30;
+export const POINTS_BASE_DEFAULT = 100;
