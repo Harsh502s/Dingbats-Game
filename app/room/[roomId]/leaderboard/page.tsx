@@ -89,13 +89,29 @@ export default function LeaderboardPage({ params }: { params: Promise<{ roomId: 
             🎉 Create New Game
           </Button>
         ) : (
-          <div className="flex flex-col items-center space-y-4">
-            <Button variant="secondary" onClick={() => router.push('/')} className="px-12 py-4 text-xl">
-              🏠 Back to Home
-            </Button>
-            <div className="bg-orange-50 text-brand-600 px-4 py-2 rounded-full text-sm font-bold flex items-center space-x-2 animate-bounce">
-              <span>📸</span>
-              <span>Take a screenshot to save your score!</span>
+          <div className="flex flex-col items-center space-y-6 w-full max-w-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+              <Button 
+                onClick={() => router.push('/')} 
+                className="py-4 px-6 flex items-center justify-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white shadow-md"
+              >
+                <span>👑</span>
+                <span>Host Your Own</span>
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                onClick={() => window.print()}
+                className="py-4 px-6 flex items-center justify-center space-x-2 border-2 border-gray-200 hover:border-brand-300"
+              >
+                <span>📸</span>
+                <span>Take Screenshot</span>
+              </Button>
+            </div>
+            
+            <div className="bg-orange-50 text-brand-600 px-6 py-3 rounded-2xl text-sm font-bold flex items-center space-x-3 border border-orange-100 animate-pulse">
+              <span className="text-xl">🏆</span>
+              <span>Great game! Share your score with your colleagues.</span>
             </div>
           </div>
         )}
