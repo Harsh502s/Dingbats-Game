@@ -39,7 +39,7 @@ export function useRoomChannel(roomId: string) {
       const [roomRes, playersRes, rpRes] = await Promise.all([
         supabase.from('game_rooms').select('*').eq('id', roomId).single(),
         supabase.from('players').select('*').eq('room_id', roomId),
-        supabase.from('room_puzzles').select('round_number, puzzles(image_url)').eq('room_id', roomId)
+        supabase.from('room_puzzles').select('round_number, puzzle_id').eq('room_id', roomId)
       ]);
 
       if (roomRes.data) setRoom(roomRes.data as Room);
@@ -51,8 +51,13 @@ export function useRoomChannel(roomId: string) {
 
       if (roomRes.data && roomRes.data.current_round > 0 && rpRes.data) {
         const currentRp = rpRes.data.find(rp => rp.round_number === roomRes.data.current_round);
-        if (currentRp) {
-          setCurrentPuzzleUrl((currentRp.puzzles as any)?.image_url || null);
+        if (currentRp?.puzzle_id) {
+          const { data: puzzle } = await supabase
+            .from('puzzles')
+            .select('image_url')
+            .eq('id', currentRp.puzzle_id)
+            .single();
+          setCurrentPuzzleUrl(puzzle?.image_url || null);
         }
       }
     };
@@ -67,13 +72,18 @@ export function useRoomChannel(roomId: string) {
         setRoom(newRoom);
         
         if (newRoom.status === 'PLAYING' && newRoom.current_round > 0) {
-          supabase.from('room_puzzles').select('puzzles(image_url)')
+          supabase.from('room_puzzles').select('puzzle_id')
             .eq('room_id', roomId)
             .eq('round_number', newRoom.current_round)
             .single()
-            .then(res => {
-              if (res.data) {
-                setCurrentPuzzleUrl((res.data.puzzles as any)?.image_url || null);
+            .then(async res => {
+              if (res.data?.puzzle_id) {
+                const { data: puzzle } = await supabase
+                  .from('puzzles')
+                  .select('image_url')
+                  .eq('id', res.data.puzzle_id)
+                  .single();
+                setCurrentPuzzleUrl(puzzle?.image_url || null);
               }
             });
         }

@@ -37,12 +37,22 @@ export async function POST(
 
     const { data: rp } = await supabase
       .from('room_puzzles')
-      .select('puzzles(image_url)')
+      .select('puzzle_id')
       .eq('room_id', roomId)
       .eq('round_number', nextRound)
       .single();
 
-    return NextResponse.json({ imageUrl: (rp?.puzzles as any)?.image_url, finished: false });
+    let imageUrl = null;
+    if (rp?.puzzle_id) {
+      const { data: puzzle } = await supabase
+        .from('puzzles')
+        .select('image_url')
+        .eq('id', rp.puzzle_id)
+        .single();
+      imageUrl = puzzle?.image_url || null;
+    }
+
+    return NextResponse.json({ imageUrl, finished: false });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Failed to advance round' }, { status: 500 });

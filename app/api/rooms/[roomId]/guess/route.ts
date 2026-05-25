@@ -48,12 +48,21 @@ export async function POST(
 
     const { data: rp } = await supabase
       .from('room_puzzles')
-      .select('puzzles(answer, points_value)')
+      .select('puzzle_id')
       .eq('room_id', roomId)
       .eq('round_number', room.current_round)
       .single();
 
-    const puzzle = rp?.puzzles as any;
+    if (!rp?.puzzle_id) {
+      return NextResponse.json({ error: 'Puzzle not found' }, { status: 500 });
+    }
+
+    const { data: puzzle } = await supabase
+      .from('puzzles')
+      .select('answer, points_value')
+      .eq('id', rp.puzzle_id)
+      .single();
+
     if (!puzzle) {
       return NextResponse.json({ error: 'Puzzle not found' }, { status: 500 });
     }

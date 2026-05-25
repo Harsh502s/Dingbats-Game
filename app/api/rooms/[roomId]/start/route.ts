@@ -68,7 +68,7 @@ export async function POST(
     // Check actual number of puzzles in the room now
     const { data: roomPuzzlesData } = await supabase
       .from('room_puzzles')
-      .select('round_number, puzzles(image_url)')
+      .select('round_number, puzzle_id')
       .eq('room_id', roomId)
       .order('round_number', { ascending: true });
 
@@ -79,6 +79,16 @@ export async function POST(
     }
 
     const firstPuzzle = roomPuzzlesData?.find(rp => rp.round_number === 1);
+    let imageUrl = null;
+
+    if (firstPuzzle?.puzzle_id) {
+      const { data: puzzle } = await supabase
+        .from('puzzles')
+        .select('image_url')
+        .eq('id', firstPuzzle.puzzle_id)
+        .single();
+      imageUrl = puzzle?.image_url || null;
+    }
 
     await supabase.from('game_rooms').update({
       status: 'PLAYING',
@@ -87,7 +97,7 @@ export async function POST(
       round_started_at: new Date().toISOString()
     }).eq('id', roomId);
 
-    return NextResponse.json({ imageUrl: (firstPuzzle?.puzzles as any)?.image_url });
+    return NextResponse.json({ imageUrl });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Failed to start game' }, { status: 500 });
