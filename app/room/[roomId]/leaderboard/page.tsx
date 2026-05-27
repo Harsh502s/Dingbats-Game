@@ -61,7 +61,7 @@ export default function LeaderboardPage({ params }: { params: Promise<{ roomId: 
   return (
     <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-12 py-16">
       <div className="text-center space-y-4">
-        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-600">
+        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-brand-600 pb-2">
           Dingbats Decoded!
         </h1>
         <p className="text-xl text-gray-500">Game Over! Here&apos;s how everyone did.</p>
