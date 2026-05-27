@@ -11,13 +11,12 @@ import { PuzzleCard } from '@/components/ui/PuzzleCard';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ScoreToast } from '@/components/ui/ScoreToast';
 import { cloudinaryUrl } from '@/lib/cloudinary';
-import { createClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function PlayPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   const router = useRouter();
-  const { room, players, currentPuzzleUrl, rawPlayers } = useRoomChannel(roomId);
+  const { room, players, currentPuzzleUrl, rawPlayers, sendBroadcast } = useRoomChannel(roomId);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [guess, setGuess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -52,16 +51,11 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
     if (!roomId || !playerId || !currentPlayer || isCorrect || room?.status !== 'PLAYING') return;
 
     const timeout = setTimeout(() => {
-      const supabase = createClient();
-      supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { playerId, playerName: currentPlayer.name, text: guess }
-      });
+      sendBroadcast('typing', { playerId, playerName: currentPlayer.name, text: guess });
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [guess, roomId, playerId, currentPlayer, isCorrect, room?.status]);
+  }, [guess, roomId, playerId, currentPlayer, isCorrect, room?.status, sendBroadcast]);
 
   if (!room || !playerId) return <div className="p-8 text-center text-gray-500">Loading...</div>;
 
@@ -107,8 +101,6 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
     if (!guess.trim() || submitting || isCorrect) return;
 
     setSubmitting(true);
-    const supabase = createClient();
-
     const res = await fetch(`/api/rooms/${roomId}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -120,23 +112,19 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
       setIsCorrect(true);
       setToastPoints(data.points);
       setTimeout(() => setToastPoints(null), 2000);
-      
-      await supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points, guessText: guess }
+
+      sendBroadcast('guess', {
+        id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points, guessText: guess
       });
     } else {
       setShowWrong(true);
       setTimeout(() => setShowWrong(false), 1500);
-      
+
       const wrongGuess = guess;
       setGuess('');
 
-      await supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false, guessText: wrongGuess }
+      sendBroadcast('guess', {
+        id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false, guessText: wrongGuess
       });
     }
     

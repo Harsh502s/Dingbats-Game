@@ -20,7 +20,7 @@ export async function POST(
 
     const { data: room } = await supabase
       .from('game_rooms')
-      .select('status, current_round, round_started_at')
+      .select('status, current_round, round_started_at, round_duration')
       .eq('id', roomId)
       .single();
 
@@ -41,8 +41,8 @@ export async function POST(
 
     const startedAt = new Date(room.round_started_at!).getTime();
     const elapsed = (Date.now() - startedAt) / 1000;
-    
-    if (elapsed > 30) {
+
+    if (elapsed > room.round_duration) {
       return NextResponse.json({ correct: false, reason: 'timeout' });
     }
 
@@ -71,9 +71,10 @@ export async function POST(
     const isCorrect = normalize(guess) === normalize(puzzle.answer);
 
     if (isCorrect) {
-      const clamped = Math.max(0, Math.min(30, elapsed));
+      const duration = room.round_duration;
+      const clamped = Math.max(0, Math.min(duration, elapsed));
       const points_value = puzzle.points_value;
-      const earned = points_value + Math.floor(points_value * (30 - clamped) / 30);
+      const earned = points_value + Math.floor(points_value * (duration - clamped) / duration);
 
       await supabase
         .from('players')

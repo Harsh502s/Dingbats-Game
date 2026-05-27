@@ -1,14 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { GuessEntry } from '@/lib/types';
 
-export type GuessEntry = {
-  id: string;
-  playerId: string;
-  playerName: string;
-  correct: boolean;
-  guessText?: string;
-  points?: number;
-};
+export type { GuessEntry };
 
 export function GuessFeed({ guesses }: { guesses: GuessEntry[] }) {
   const containerRef = useRef<HTMLDivElement>(null);

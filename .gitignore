@@ -45,3 +45,9 @@ Puzzles/
 scripts/*.ts.log
 *.log
 .gemini/
+
+# claude / kiro IDE settings
+.claude/
+
+# graphify knowledge graph output (generated, not source)
+graphify-out/

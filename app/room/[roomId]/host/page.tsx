@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRoomChannel } from '@/lib/realtime/useRoomChannel';
 import { Button } from '@/components/ui/Button';
@@ -27,13 +27,13 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
   const [activeTab, setActiveTab] = useState<'custom' | 'library' | 'create'>('custom');
   const [newPackName, setNewPackName] = useState('');
 
-  const fetchPacks = async () => {
+  const fetchPacks = useCallback(async () => {
     try {
       const res = await fetch('/api/packs');
       const data = await res.json();
       if (data.packs) {
         setAvailablePacks(data.packs);
-        // If we are in library tab and nothing is selected, select the first one
+        // Auto-select first pack only when in library tab with nothing selected
         if (activeTab === 'library' && !selectedPack && data.packs.length > 0) {
           setSelectedPack(data.packs[0]);
         }
@@ -41,7 +41,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     } catch (err) {
       console.error('Failed to fetch packs:', err);
     }
-  };
+  }, [activeTab, selectedPack]);
 
   const handleDeletePack = async (e: React.MouseEvent, packName: string) => {
     e.stopPropagation(); // Don't select the pack when clicking delete
@@ -70,7 +70,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
 
   useEffect(() => {
     fetchPacks();
-  }, [activeTab]);
+  }, [fetchPacks]);
 
   useEffect(() => {
     const id = localStorage.getItem('dingbats_host_id');
