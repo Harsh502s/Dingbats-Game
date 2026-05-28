@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoomChannel } from '@/lib/realtime/useRoomChannel';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 export default function PlayPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   const router = useRouter();
-  const { room, players, currentPuzzleUrl, rawPlayers, sendBroadcast } = useRoomChannel(roomId);
+  const { room, players, currentPuzzleUrl, rawPlayers, sendBroadcast, error, notFound: roomNotFound } = useRoomChannel(roomId);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [guess, setGuess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +58,32 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
     return () => clearTimeout(timeout);
   }, [guess, roomId, playerId, currentPlayer, isCorrect, room?.status, sendBroadcast]);
 
-  if (!room || !playerId) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  if (roomNotFound) {
+    notFound();
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  if (!room || !playerId) {
+    return (
+      <main className="min-h-screen p-8 max-w-4xl mx-auto">
+        <div className="space-y-6">
+          <div className="h-12 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="aspect-square bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+            <div className="space-y-6">
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (room?.status === 'FINISHED') return null;
 

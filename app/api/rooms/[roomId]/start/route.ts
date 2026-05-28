@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { verifyHostRequest } from '@/lib/auth/verifyHostToken';
 
 export async function POST(
   req: Request,
@@ -7,9 +8,11 @@ export async function POST(
 ) {
   try {
     const { roomId } = await params;
-    const hostId = req.headers.get('x-host-id');
+    const hostVerify = await verifyHostRequest(req, roomId);
 
-    if (!hostId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (hostVerify instanceof NextResponse) {
+      return hostVerify;
+    }
 
     const supabase = createAdminClient();
 
@@ -19,8 +22,8 @@ export async function POST(
       .eq('id', roomId)
       .single();
 
-    if (!room || room.host_id !== hostId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
     if (room.status !== 'LOBBY') {
       return NextResponse.json({ error: 'Already started' }, { status: 400 });
@@ -55,7 +58,7 @@ export async function POST(
 
       // Shuffle and take total_rounds
       const shuffled = libraryPuzzles.sort(() => Math.random() - 0.5).slice(0, room.total_rounds);
-      
+
       const roomPuzzles = shuffled.map((p, i) => ({
         room_id: roomId,
         round_number: i + 1,

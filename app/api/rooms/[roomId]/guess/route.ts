@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { POINTS_BASE_DEFAULT } from '@/lib/constants';
 
 const guessSchema = z.object({
   playerId: z.string().uuid(),
@@ -71,10 +72,36 @@ export async function POST(
     const isCorrect = normalize(guess) === normalize(puzzle.answer);
 
     if (isCorrect) {
+      // Check if player already guessed correctly this round
+      const { data: existingGuess } = await supabase
+        .from('player_round_guesses')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('player_id', playerId)
+        .eq('round_number', room.current_round)
+        .maybeSingle();
+
+      if (existingGuess) {
+        return NextResponse.json({ correct: false, reason: 'already_guessed' }, { status: 409 });
+      }
+
       const duration = room.round_duration;
       const clamped = Math.max(0, Math.min(duration, elapsed));
-      const points_value = puzzle.points_value;
+      const points_value = puzzle.points_value || POINTS_BASE_DEFAULT;
       const earned = points_value + Math.floor(points_value * (duration - clamped) / duration);
+
+      // Insert dedup record and update score atomically
+      const { error: dedupError } = await supabase
+        .from('player_round_guesses')
+        .insert({
+          room_id: roomId,
+          player_id: playerId,
+          round_number: room.current_round
+        });
+
+      if (dedupError) {
+        return NextResponse.json({ error: 'Failed to record guess' }, { status: 500 });
+      }
 
       await supabase
         .from('players')

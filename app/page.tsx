@@ -27,12 +27,12 @@ export default function Home() {
       });
 
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to create room');
       }
 
-      localStorage.setItem('dingbats_host_id', data.hostId);
+      localStorage.setItem(`dingbats_host_token_${data.roomId}`, data.hostToken);
       router.push(data.hostUrl);
     } catch (err: any) {
       setError(err.message);

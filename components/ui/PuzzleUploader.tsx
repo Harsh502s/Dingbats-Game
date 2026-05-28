@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 
@@ -16,21 +16,21 @@ interface QueueItem {
 interface PuzzleUploaderProps {
   uploadType: 'room' | 'pack';
   roomId?: string;
-  hostId: string;
+  hostToken: string;
   packName?: string;
   uploadedCount?: number;
   totalRounds?: number;
   onUploadComplete?: () => void;
 }
 
-export function PuzzleUploader({ 
-  uploadType, 
-  roomId, 
-  hostId, 
-  packName, 
-  uploadedCount = 0, 
-  totalRounds = 10, 
-  onUploadComplete 
+export function PuzzleUploader({
+  uploadType,
+  roomId,
+  hostToken,
+  packName,
+  uploadedCount = 0,
+  totalRounds = 10,
+  onUploadComplete
 }: PuzzleUploaderProps) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -72,8 +72,22 @@ export function PuzzleUploader({
   };
 
   const removeFromQueue = (id: string) => {
-    setQueue(prev => prev.filter(q => q.id !== id));
+    setQueue(prev => {
+      const item = prev.find(q => q.id === id);
+      if (item) {
+        URL.revokeObjectURL(item.preview);
+      }
+      return prev.filter(q => q.id !== id);
+    });
   };
+
+  useEffect(() => {
+    return () => {
+      queue.forEach(item => {
+        URL.revokeObjectURL(item.preview);
+      });
+    };
+  }, []);
 
   const uploadAll = async () => {
     const pending = queue.filter(q => q.status === 'pending' && q.answer.trim());
@@ -98,7 +112,7 @@ export function PuzzleUploader({
       try {
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'x-host-id': hostId },
+          headers: { 'x-host-token': hostToken },
           body: formData
         });
         const data = await res.json();

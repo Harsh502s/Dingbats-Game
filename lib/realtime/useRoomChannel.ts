@@ -13,6 +13,8 @@ export function useRoomChannel(roomId: string) {
   const [uploadedCount, setUploadedCount] = useState(0);
   const [guesses, setGuesses] = useState<GuessEntry[]>([]);
   const [typing, setTyping] = useState<Record<string, { name: string, text: string }>>({});
+  const [error, setError] = useState<Error | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
@@ -20,29 +22,41 @@ export function useRoomChannel(roomId: string) {
     const supabase = createClient();
 
     const fetchInitial = async () => {
-      const [roomRes, playersRes, rpRes] = await Promise.all([
-        supabase.from('game_rooms').select('*').eq('id', roomId).single(),
-        supabase.from('players').select('*').eq('room_id', roomId),
-        supabase.from('room_puzzles').select('round_number, puzzle_id').eq('room_id', roomId)
-      ]);
+      try {
+        const [roomRes, playersRes, rpRes] = await Promise.all([
+          supabase.from('game_rooms').select('*').eq('id', roomId).single(),
+          supabase.from('players').select('*').eq('room_id', roomId),
+          supabase.from('room_puzzles').select('round_number, puzzle_id').eq('room_id', roomId)
+        ]);
 
-      if (roomRes.data) setRoom(roomRes.data as Room);
-      if (playersRes.data) setPlayers(playersRes.data as Player[]);
-      
-      if (rpRes.data) {
-        setUploadedCount(rpRes.data.length);
-      }
-
-      if (roomRes.data && roomRes.data.current_round > 0 && rpRes.data) {
-        const currentRp = rpRes.data.find(rp => rp.round_number === roomRes.data.current_round);
-        if (currentRp?.puzzle_id) {
-          const { data: puzzle } = await supabase
-            .from('puzzles')
-            .select('image_url')
-            .eq('id', currentRp.puzzle_id)
-            .single();
-          setCurrentPuzzleUrl(puzzle?.image_url || null);
+        if (roomRes.error) {
+          if (roomRes.error.code === 'PGRST116') {
+            setNotFound(true);
+            return;
+          }
+          throw roomRes.error;
         }
+
+        if (roomRes.data) setRoom(roomRes.data as Room);
+        if (playersRes.data) setPlayers(playersRes.data as Player[]);
+
+        if (rpRes.data) {
+          setUploadedCount(rpRes.data.length);
+        }
+
+        if (roomRes.data && roomRes.data.current_round > 0 && rpRes.data) {
+          const currentRp = rpRes.data.find(rp => rp.round_number === roomRes.data.current_round);
+          if (currentRp?.puzzle_id) {
+            const { data: puzzle } = await supabase
+              .from('puzzles')
+              .select('image_url')
+              .eq('id', currentRp.puzzle_id)
+              .single();
+            setCurrentPuzzleUrl(puzzle?.image_url || null);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to load room'));
       }
     };
 
@@ -139,5 +153,7 @@ export function useRoomChannel(roomId: string) {
     setGuesses,
     typing,
     sendBroadcast,
+    error,
+    notFound,
   };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { verifyHostRequest } from '@/lib/auth/verifyHostToken';
 
 export async function DELETE(
   req: Request,
@@ -7,22 +8,22 @@ export async function DELETE(
 ) {
   try {
     const { roomId, playerId } = await params;
-    const hostId = req.headers.get('x-host-id');
+    const hostVerify = await verifyHostRequest(req, roomId);
 
-    if (!hostId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (hostVerify instanceof NextResponse) {
+      return hostVerify;
     }
 
     const supabase = createAdminClient();
-    
+
     const { data: room } = await supabase
       .from('game_rooms')
-      .select('host_id, status')
+      .select('status')
       .eq('id', roomId)
       .single();
 
-    if (!room || room.host_id !== hostId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
     if (room.status !== 'LOBBY') {
       return NextResponse.json({ error: 'Can only kick in lobby' }, { status: 400 });

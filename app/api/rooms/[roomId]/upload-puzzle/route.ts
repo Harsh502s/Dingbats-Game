@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
+import { verifyHostRequest } from '@/lib/auth/verifyHostToken';
 
 export async function POST(
   req: Request,
@@ -8,20 +9,22 @@ export async function POST(
 ) {
   try {
     const { roomId } = await params;
-    const hostId = req.headers.get('x-host-id');
+    const hostVerify = await verifyHostRequest(req, roomId);
 
-    if (!hostId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (hostVerify instanceof NextResponse) {
+      return hostVerify;
+    }
 
     const supabase = createAdminClient();
 
     const { data: room } = await supabase
       .from('game_rooms')
-      .select('host_id, status, total_rounds')
+      .select('total_rounds')
       .eq('id', roomId)
       .single();
 
-    if (!room || room.host_id !== hostId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
     const formData = await req.formData();
