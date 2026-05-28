@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import { signHostToken } from '@/lib/auth/verifyHostToken';
 
 const createRoomSchema = z.object({
   totalRounds: z.number().int().min(1).max(20),
@@ -30,9 +31,11 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    const hostToken = await signHostToken({ roomId, hostId });
+
     return NextResponse.json({
       roomId: roomId,
-      hostId: hostId,
+      hostToken: hostToken,
       joinUrl: `/room/${roomId}/join`,
       hostUrl: `/room/${roomId}/host`
     });

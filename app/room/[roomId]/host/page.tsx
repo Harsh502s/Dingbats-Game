@@ -1,7 +1,8 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { useRoomChannel } from '@/lib/realtime/useRoomChannel';
 import { Button } from '@/components/ui/Button';
 import { PlayerList } from '@/components/ui/PlayerList';
@@ -17,23 +18,23 @@ import { createClient } from '@/lib/supabase/client';
 export default function HostPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   const router = useRouter();
-  const { room, players, currentPuzzleUrl, uploadedCount, guesses, setGuesses, typing } = useRoomChannel(roomId);
+  const { room, players, currentPuzzleUrl, uploadedCount, guesses, setGuesses, typing, error, notFound: roomNotFound } = useRoomChannel(roomId);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [hostId, setHostId] = useState<string | null>(null);
+  const [formError, setFormError] = useState('');
+  const [hostToken, setHostToken] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
   const [availablePacks, setAvailablePacks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'custom' | 'library' | 'create'>('custom');
   const [newPackName, setNewPackName] = useState('');
 
-  const fetchPacks = async () => {
+  const fetchPacks = useCallback(async () => {
     try {
       const res = await fetch('/api/packs');
       const data = await res.json();
       if (data.packs) {
         setAvailablePacks(data.packs);
-        // If we are in library tab and nothing is selected, select the first one
+        // Auto-select first pack only when in library tab with nothing selected
         if (activeTab === 'library' && !selectedPack && data.packs.length > 0) {
           setSelectedPack(data.packs[0]);
         }
@@ -41,16 +42,16 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     } catch (err) {
       console.error('Failed to fetch packs:', err);
     }
-  };
+  }, [activeTab, selectedPack]);
 
   const handleDeletePack = async (e: React.MouseEvent, packName: string) => {
-    e.stopPropagation(); // Don't select the pack when clicking delete
+    e.stopPropagation();
     if (!confirm(`Are you sure you want to delete the pack "${packName}"? This cannot be undone.`)) return;
 
     try {
       const res = await fetch('/api/packs/delete', {
         method: 'DELETE',
-        headers: { 'x-host-id': hostId!, 'Content-Type': 'application/json' },
+        headers: { 'x-host-token': hostToken!, 'Content-Type': 'application/json' },
         body: JSON.stringify({ packName })
       });
       if (res.ok) {
@@ -70,15 +71,25 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
 
   useEffect(() => {
     fetchPacks();
+  }, [fetchPacks]);
+
+  // Reset form when leaving create tab
+  useEffect(() => {
+    if (activeTab !== 'create') {
+      setNewPackName('');
+    }
   }, [activeTab]);
 
   useEffect(() => {
-    const id = localStorage.getItem('dingbats_host_id');
-    setHostId(id);
-    if (!id) {
+    const token = localStorage.getItem(`dingbats_host_token_${roomId}`);
+    setHostToken(token);
+    if (!token) {
       router.push('/');
+    } else {
+      // Set cookie for middleware route guard
+      document.cookie = `dingbats_host_token_${roomId}=${token}; path=/; max-age=86400`;
     }
-  }, [router]);
+  }, [router, roomId]);
 
   useEffect(() => {
     if (room?.status === 'FINISHED') {
@@ -86,57 +97,83 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     }
   }, [room?.status, router, roomId]);
 
-  useEffect(() => {
-    if (room?.status === 'PLAYING' && players.length > 0) {
-      const correctGuesserIds = new Set(guesses.filter(g => g.correct).map(g => g.playerId));
-      const activePlayerIds = players.map(p => p.id);
-
-      const allGuessed = activePlayerIds.every(id => correctGuesserIds.has(id));
-
-      if (allGuessed && !loading) {
-        handleNextRound();
-      }
-    }
-  }, [guesses, players.length, room?.status, loading]);
-
   // Guesses now managed by useRoomChannel
 
-  if (!room || !hostId) return <div className="p-8 text-center text-gray-500">Loading...</div>;
-  if (room.host_id !== hostId) return <div className="p-8 text-center text-red-500">Unauthorized</div>;
-  if (room.status === 'FINISHED') return null;
+  if (roomNotFound) {
+    notFound();
+  }
 
-  const handleStart = async () => {
+  if (error) {
+    throw error;
+  }
+
+  // Define all hooks BEFORE any conditional returns
+  const handleStart = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setFormError('');
     const res = await fetch(`/api/rooms/${roomId}/start`, {
       method: 'POST',
-      headers: { 'x-host-id': hostId, 'Content-Type': 'application/json' },
+      headers: { 'x-host-token': hostToken!, 'Content-Type': 'application/json' },
       body: JSON.stringify({ packName: selectedPack })
     });
     const data = await res.json();
-    if (!res.ok) setError(data.error);
+    if (!res.ok) setFormError(data.error);
     setLoading(false);
-  };
+  }, [roomId, hostToken, selectedPack]);
 
-  const handleNextRound = async () => {
+  const handleNextRound = useCallback(async () => {
     if (loading) return;
     setIsPaused(false);
     setLoading(true);
     setGuesses([]);
     const res = await fetch(`/api/rooms/${roomId}/next-round`, {
       method: 'POST',
-      headers: { 'x-host-id': hostId }
+      headers: { 'x-host-token': hostToken! }
     });
     await res.json();
     setLoading(false);
-  };
+  }, [roomId, hostToken, loading]);
 
-  const handleKick = async (playerId: string) => {
+  const handleKick = useCallback(async (playerId: string) => {
     await fetch(`/api/rooms/${roomId}/players/${playerId}`, {
       method: 'DELETE',
-      headers: { 'x-host-id': hostId }
+      headers: { 'x-host-token': hostToken! }
     });
-  };
+  }, [roomId, hostToken]);
+
+  // Auto-advance when all players have guessed
+  useEffect(() => {
+    if (!room || room.status !== 'PLAYING' || loading) return;
+
+    const uniqueGuessers = new Set(guesses.map(g => g.playerId));
+    const activePlayers = players.filter(p => !p.is_kicked);
+
+    if (activePlayers.length > 0 && uniqueGuessers.size === activePlayers.length) {
+      handleNextRound();
+    }
+  }, [guesses, players, room, loading, handleNextRound]);
+
+  // NOW conditional returns are safe
+  if (!room || !hostToken) {
+    return (
+      <main className="min-h-screen p-8 max-w-4xl mx-auto">
+        <div className="space-y-8">
+          <div className="h-12 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="h-96 bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+            <div className="space-y-6">
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (room.status === 'FINISHED') return null;
 
 
 
@@ -192,7 +229,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
               <PuzzleUploader
                 uploadType="room"
                 roomId={roomId}
-                hostId={hostId!}
+                hostToken={hostToken!}
                 uploadedCount={uploadedCount}
                 totalRounds={room.total_rounds}
               />
@@ -282,9 +319,12 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                   onChange={(e) => setNewPackName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-brand-500 outline-none"
                 />
+                {newPackName && newPackName.trim().length < 3 && (
+                  <p className="text-xs text-red-500 font-medium">Pack name must be at least 3 characters</p>
+                )}
               </div>
 
-              {newPackName.trim().length > 2 ? (
+              {newPackName.trim().length >= 3 ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Add Puzzles to "{newPackName}"</h3>
@@ -293,7 +333,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                   <PuzzleUploader
                     uploadType="pack"
                     packName={newPackName}
-                    hostId={hostId!}
+                    hostToken={hostToken!}
                     onUploadComplete={() => {
                       fetchPacks();
                     }}
@@ -320,7 +360,7 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
           <PlayerList players={players} onKick={handleKick} />
         </div>
 
-        {error && <div className="text-center text-red-500">{error}</div>}
+        {formError && <div className="text-center text-red-500">{formError}</div>}
 
         <div className="flex justify-center pb-8">
           <Button onClick={handleStart} loading={loading} disabled={players.length === 0 || (!selectedPack && uploadedCount < room.total_rounds)} className="px-8 py-4 text-lg">

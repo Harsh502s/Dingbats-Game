@@ -1,12 +1,13 @@
 {
-  "name": "temp-app",
+  "name": "dingbats-game",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -14,10 +15,11 @@
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "framer-motion": "^12.38.0",
+    "jose": "^6.2.3",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "uuid": "^14.0.0",
+    "uuid": "^10.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -26,11 +28,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "tsx": "^4.22.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

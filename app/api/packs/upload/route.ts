@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createHash } from 'crypto';
+import { verifyHostToken } from '@/lib/auth/verifyHostToken';
 
 export async function POST(req: Request) {
   try {
-    const hostId = req.headers.get('x-host-id');
-    if (!hostId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const token = req.headers.get('x-host-token');
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    try {
+      await verifyHostToken(token);
+    } catch (error) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const formData = await req.formData();
     const file = formData.get('image') as File;
@@ -37,11 +44,11 @@ export async function POST(req: Request) {
     const { data: puzzle, error: puzzleError } = await supabase
       .from('puzzles')
       .upsert(
-        { 
-          image_url: publicUrl, 
-          answer: answer.toLowerCase().trim(), 
-          points_value: 100, 
-          pack_name: packName 
+        {
+          image_url: publicUrl,
+          answer: answer.toLowerCase().trim(),
+          points_value: 100,
+          pack_name: packName
         },
         { onConflict: 'image_url' }
       )

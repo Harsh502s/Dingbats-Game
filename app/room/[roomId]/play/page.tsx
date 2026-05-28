@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRoomChannel } from '@/lib/realtime/useRoomChannel';
 import { Button } from '@/components/ui/Button';
@@ -11,13 +12,12 @@ import { PuzzleCard } from '@/components/ui/PuzzleCard';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ScoreToast } from '@/components/ui/ScoreToast';
 import { cloudinaryUrl } from '@/lib/cloudinary';
-import { createClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function PlayPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
   const router = useRouter();
-  const { room, players, currentPuzzleUrl, rawPlayers } = useRoomChannel(roomId);
+  const { room, players, currentPuzzleUrl, rawPlayers, sendBroadcast, error, notFound: roomNotFound } = useRoomChannel(roomId);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [guess, setGuess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -52,18 +52,38 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
     if (!roomId || !playerId || !currentPlayer || isCorrect || room?.status !== 'PLAYING') return;
 
     const timeout = setTimeout(() => {
-      const supabase = createClient();
-      supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { playerId, playerName: currentPlayer.name, text: guess }
-      });
+      sendBroadcast('typing', { playerId, playerName: currentPlayer.name, text: guess });
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [guess, roomId, playerId, currentPlayer, isCorrect, room?.status]);
+  }, [guess, roomId, playerId, currentPlayer, isCorrect, room?.status, sendBroadcast]);
 
-  if (!room || !playerId) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  if (roomNotFound) {
+    notFound();
+  }
+
+  if (error) {
+    throw error;
+  }
+
+  if (!room || !playerId) {
+    return (
+      <main className="min-h-screen p-8 max-w-4xl mx-auto">
+        <div className="space-y-6">
+          <div className="h-12 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="aspect-square bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+            <div className="space-y-6">
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+              <div className="h-64 bg-gray-200 rounded-2xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (room?.status === 'FINISHED') return null;
 
@@ -107,8 +127,6 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
     if (!guess.trim() || submitting || isCorrect) return;
 
     setSubmitting(true);
-    const supabase = createClient();
-
     const res = await fetch(`/api/rooms/${roomId}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -120,23 +138,19 @@ export default function PlayPage({ params }: { params: Promise<{ roomId: string 
       setIsCorrect(true);
       setToastPoints(data.points);
       setTimeout(() => setToastPoints(null), 2000);
-      
-      await supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points, guessText: guess }
+
+      sendBroadcast('guess', {
+        id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: true, points: data.points, guessText: guess
       });
     } else {
       setShowWrong(true);
       setTimeout(() => setShowWrong(false), 1500);
-      
+
       const wrongGuess = guess;
       setGuess('');
 
-      await supabase.channel(`room:${roomId}`).send({
-        type: 'broadcast',
-        event: 'guess',
-        payload: { id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false, guessText: wrongGuess }
+      sendBroadcast('guess', {
+        id: uuidv4(), playerId, playerName: currentPlayer?.name, correct: false, guessText: wrongGuess
       });
     }
     

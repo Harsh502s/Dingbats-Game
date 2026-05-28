@@ -1,27 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { Player, Room, GuessEntry } from '@/lib/types';
 
-export type Player = {
-  id: string;
-  name: string;
-  score: number;
-  is_kicked: boolean;
-};
-
-export type RoomStatus = 'LOBBY' | 'PLAYING' | 'FINISHED';
-
-export type Room = {
-  id: string;
-  host_id: string;
-  status: RoomStatus;
-  current_round: number;
-  total_rounds: number;
-  round_started_at: string | null;
-  round_duration: number;
-};
-
-import { GuessEntry } from '@/components/ui/GuessFeed';
+export type { Player, Room, GuessEntry };
 
 export function useRoomChannel(roomId: string) {
   const [room, setRoom] = useState<Room | null>(null);
@@ -30,35 +13,50 @@ export function useRoomChannel(roomId: string) {
   const [uploadedCount, setUploadedCount] = useState(0);
   const [guesses, setGuesses] = useState<GuessEntry[]>([]);
   const [typing, setTyping] = useState<Record<string, { name: string, text: string }>>({});
+  const [error, setError] = useState<Error | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
     if (!roomId) return;
     const supabase = createClient();
 
     const fetchInitial = async () => {
-      const [roomRes, playersRes, rpRes] = await Promise.all([
-        supabase.from('game_rooms').select('*').eq('id', roomId).single(),
-        supabase.from('players').select('*').eq('room_id', roomId),
-        supabase.from('room_puzzles').select('round_number, puzzle_id').eq('room_id', roomId)
-      ]);
+      try {
+        const [roomRes, playersRes, rpRes] = await Promise.all([
+          supabase.from('game_rooms').select('*').eq('id', roomId).single(),
+          supabase.from('players').select('*').eq('room_id', roomId),
+          supabase.from('room_puzzles').select('round_number, puzzle_id').eq('room_id', roomId)
+        ]);
 
-      if (roomRes.data) setRoom(roomRes.data as Room);
-      if (playersRes.data) setPlayers(playersRes.data as Player[]);
-      
-      if (rpRes.data) {
-        setUploadedCount(rpRes.data.length);
-      }
-
-      if (roomRes.data && roomRes.data.current_round > 0 && rpRes.data) {
-        const currentRp = rpRes.data.find(rp => rp.round_number === roomRes.data.current_round);
-        if (currentRp?.puzzle_id) {
-          const { data: puzzle } = await supabase
-            .from('puzzles')
-            .select('image_url')
-            .eq('id', currentRp.puzzle_id)
-            .single();
-          setCurrentPuzzleUrl(puzzle?.image_url || null);
+        if (roomRes.error) {
+          if (roomRes.error.code === 'PGRST116') {
+            setNotFound(true);
+            return;
+          }
+          throw roomRes.error;
         }
+
+        if (roomRes.data) setRoom(roomRes.data as Room);
+        if (playersRes.data) setPlayers(playersRes.data as Player[]);
+
+        if (rpRes.data) {
+          setUploadedCount(rpRes.data.length);
+        }
+
+        if (roomRes.data && roomRes.data.current_round > 0 && rpRes.data) {
+          const currentRp = rpRes.data.find(rp => rp.round_number === roomRes.data.current_round);
+          if (currentRp?.puzzle_id) {
+            const { data: puzzle } = await supabase
+              .from('puzzles')
+              .select('image_url')
+              .eq('id', currentRp.puzzle_id)
+              .single();
+            setCurrentPuzzleUrl(puzzle?.image_url || null);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to load room'));
       }
     };
 
@@ -70,7 +68,7 @@ export function useRoomChannel(roomId: string) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomId}` }, (payload) => {
         const newRoom = payload.new as Room;
         setRoom(newRoom);
-        
+
         if (newRoom.status === 'PLAYING' && newRoom.current_round > 0) {
           supabase.from('room_puzzles').select('puzzle_id')
             .eq('room_id', roomId)
@@ -107,7 +105,6 @@ export function useRoomChannel(roomId: string) {
       })
       .on('broadcast', { event: 'guess' }, (payload) => {
         setGuesses(prev => [...prev, payload.payload as GuessEntry]);
-        // Clear typing when a guess is submitted
         if (payload.payload.playerId) {
           setTyping(prev => {
             const next = { ...prev };
@@ -134,19 +131,29 @@ export function useRoomChannel(roomId: string) {
         console.log("Realtime status:", status);
       });
 
+    channelRef.current = channel;
+
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [roomId]);
 
-  return { 
-    room, 
-    players: players.filter(p => !p.is_kicked).sort((a,b) => b.score - a.score), 
+  const sendBroadcast = useCallback((event: string, payload: Record<string, unknown>) => {
+    channelRef.current?.send({ type: 'broadcast', event, payload });
+  }, []);
+
+  return {
+    room,
+    players: players.filter(p => !p.is_kicked).sort((a,b) => b.score - a.score),
     currentPuzzleUrl,
     rawPlayers: players,
     uploadedCount,
     guesses,
     setGuesses,
-    typing
+    typing,
+    sendBroadcast,
+    error,
+    notFound,
   };
 }
