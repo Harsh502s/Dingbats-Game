@@ -33,6 +33,8 @@ export default function Home() {
       }
 
       localStorage.setItem(`dingbats_host_token_${data.roomId}`, data.hostToken);
+      // Set cookie for middleware route guard (24h expiry)
+      document.cookie = `dingbats_host_token_${data.roomId}=${data.hostToken}; path=/; max-age=86400`;
       router.push(data.hostUrl);
     } catch (err: any) {
       setError(err.message);

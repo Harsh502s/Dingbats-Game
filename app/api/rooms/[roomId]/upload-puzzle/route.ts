@@ -74,7 +74,7 @@ export async function POST(
     const { data: puzzle, error: puzzleError } = await supabase
       .from('puzzles')
       .upsert(
-        { image_url: publicUrl, answer: answer.toLowerCase().trim(), points_value: 100, times_used: 0 },
+        { image_url: publicUrl, answer: answer.toLowerCase().trim(), points_value: 100 },
         { onConflict: 'image_url', ignoreDuplicates: false }
       )
       .select()

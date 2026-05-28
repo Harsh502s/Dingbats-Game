@@ -73,6 +73,13 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     fetchPacks();
   }, [fetchPacks]);
 
+  // Reset form when leaving create tab
+  useEffect(() => {
+    if (activeTab !== 'create') {
+      setNewPackName('');
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     const token = localStorage.getItem(`dingbats_host_token_${roomId}`);
     setHostToken(token);
@@ -100,6 +107,53 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
     throw error;
   }
 
+  // Define all hooks BEFORE any conditional returns
+  const handleStart = useCallback(async () => {
+    setLoading(true);
+    setFormError('');
+    const res = await fetch(`/api/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: { 'x-host-token': hostToken!, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packName: selectedPack })
+    });
+    const data = await res.json();
+    if (!res.ok) setFormError(data.error);
+    setLoading(false);
+  }, [roomId, hostToken, selectedPack]);
+
+  const handleNextRound = useCallback(async () => {
+    if (loading) return;
+    setIsPaused(false);
+    setLoading(true);
+    setGuesses([]);
+    const res = await fetch(`/api/rooms/${roomId}/next-round`, {
+      method: 'POST',
+      headers: { 'x-host-token': hostToken! }
+    });
+    await res.json();
+    setLoading(false);
+  }, [roomId, hostToken, loading]);
+
+  const handleKick = useCallback(async (playerId: string) => {
+    await fetch(`/api/rooms/${roomId}/players/${playerId}`, {
+      method: 'DELETE',
+      headers: { 'x-host-token': hostToken! }
+    });
+  }, [roomId, hostToken]);
+
+  // Auto-advance when all players have guessed
+  useEffect(() => {
+    if (!room || room.status !== 'PLAYING' || loading) return;
+
+    const uniqueGuessers = new Set(guesses.map(g => g.playerId));
+    const activePlayers = players.filter(p => !p.is_kicked);
+
+    if (activePlayers.length > 0 && uniqueGuessers.size === activePlayers.length) {
+      handleNextRound();
+    }
+  }, [guesses, players, room, loading, handleNextRound]);
+
+  // NOW conditional returns are safe
   if (!room || !hostToken) {
     return (
       <main className="min-h-screen p-8 max-w-4xl mx-auto">
@@ -120,39 +174,6 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
   }
 
   if (room.status === 'FINISHED') return null;
-
-  const handleStart = async () => {
-    setLoading(true);
-    setFormError('');
-    const res = await fetch(`/api/rooms/${roomId}/start`, {
-      method: 'POST',
-      headers: { 'x-host-token': hostToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packName: selectedPack })
-    });
-    const data = await res.json();
-    if (!res.ok) setFormError(data.error);
-    setLoading(false);
-  };
-
-  const handleNextRound = useCallback(async () => {
-    if (loading) return;
-    setIsPaused(false);
-    setLoading(true);
-    setGuesses([]);
-    const res = await fetch(`/api/rooms/${roomId}/next-round`, {
-      method: 'POST',
-      headers: { 'x-host-token': hostToken }
-    });
-    await res.json();
-    setLoading(false);
-  }, [roomId, hostToken, loading]);
-
-  const handleKick = async (playerId: string) => {
-    await fetch(`/api/rooms/${roomId}/players/${playerId}`, {
-      method: 'DELETE',
-      headers: { 'x-host-token': hostToken }
-    });
-  };
 
 
 
@@ -298,9 +319,12 @@ export default function HostPage({ params }: { params: Promise<{ roomId: string 
                   onChange={(e) => setNewPackName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-brand-500 outline-none"
                 />
+                {newPackName && newPackName.trim().length < 3 && (
+                  <p className="text-xs text-red-500 font-medium">Pack name must be at least 3 characters</p>
+                )}
               </div>
 
-              {newPackName.trim().length > 2 ? (
+              {newPackName.trim().length >= 3 ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Add Puzzles to "{newPackName}"</h3>
