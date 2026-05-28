@@ -1,6 +1,17 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# ============================================================================
+# Environment & Secrets
+# ============================================================================
+.env.local
+.env.*.local
+.env.production.local
+.env*
+*.pem
+
+# ============================================================================
+# Build & Dependencies
+# ============================================================================
 /node_modules
 /.pnp
 .pnp.*
@@ -9,45 +20,55 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
-# testing
-/coverage
-
-# next.js
 /.next/
 /out/
-
-# production
 /build
+/dist
+*.tsbuildinfo
+next-env.d.ts
 
-# misc
+# ============================================================================
+# IDE & OS
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+/coverage
+.nyc_output/
+
+# ============================================================================
+# Logs
+# ============================================================================
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# ============================================================================
+# Temporary Files
+# ============================================================================
+.tmp/
+temp/
+*.tmp
 
-# vercel
+# ============================================================================
+# Vercel
+# ============================================================================
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# local assets
+# ============================================================================
+# Project-specific (Dingbats)
+# ============================================================================
 Puzzles/
 scripts/*.ts.log
-*.log
 .gemini/
-
-# claude / kiro IDE settings
 .claude/
-
-# graphify knowledge graph output (generated, not source)
 graphify-out/
